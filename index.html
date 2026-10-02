@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>スロット</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html, body {
+    height: 100%;
+    width: 100%;
+    font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f5f2ee;
+    color: #2a2a2a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    user-select: none;
+    -webkit-user-select: none;
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  .heading { text-align: center; }
+  .heading .label {
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: #b3aca1;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .heading .title {
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    font-size: 22px;
+    color: #2a2a2a;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    word-break: break-all;
+  }
+  .card {
+    width: 100%;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow:
+      0 1px 2px rgba(0,0,0,0.04),
+      0 12px 32px rgba(0,0,0,0.06);
+  }
+  .text-input {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    margin-bottom: 6px;
+  }
+  .text-input input {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid #efeae0;
+    border-radius: 10px;
+    background: #fafaf7;
+    color: #2a2a2a;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    min-height: 44px;
+    transition: border-color .2s ease, background .2s ease;
+  }
+  .text-input input:focus {
+    border-color: #b3aca1;
+    background: #ffffff;
+  }
+  .text-input input:disabled {
+    opacity: 0.5;
+  }
+  .text-input button {
+    appearance: none;
+    border: 1px solid #efeae0;
+    background: #fafaf7;
+    color: #2a2a2a;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    padding: 0 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    min-height: 44px;
+    transition: background .2s ease, transform .08s ease, opacity .2s ease;
+  }
+  .text-input button:hover:not(:disabled) { background: #f0ebe1; }
+  .text-input button:active:not(:disabled) { transform: scale(0.97); }
+  .text-input button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .char-count {
+    font-size: 11px;
+    color: #b3aca1;
+    text-align: right;
+    letter-spacing: 0.05em;
+    margin-bottom: 14px;
+    min-height: 1.2em;
+  }
+  .char-count.error { color: #c44; }
+
+  .reels {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+  }
+  .reel {
+    flex: 1 1 0;
+    min-width: 0;
+    aspect-ratio: 1 / 1.15;
+    position: relative;
+    background: #fafaf7;
+    border-radius: clamp(6px, calc(60px / var(--reel-count, 5)), 14px);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #efeae0;
+    transition: border-color .25s ease, background .25s ease;
+  }
+  .reel.win {
+    border-color: #d9b384;
+    background: #fdf6ec;
+  }
+  .reel-stream, .reel-stop {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .reel-stream { display: none; }
+  .reel.spinning .reel-stream { display: block; }
+  .reel:not(.spinning) .reel-stop {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .reel.spinning .reel-stop { display: none; }
+  .reel-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .reel.spinning .reel-track {
+    animation: roll .14s linear infinite;
+  }
+  .glyph {
+    flex: 0 0 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    font-weight: 400;
+    color: #2a2a2a;
+    font-size: clamp(14px, calc(32vw / var(--reel-count, 5)), 56px);
+    line-height: 1;
+  }
+  @keyframes roll {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-100%); }
+  }
+
+  .controls {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .meta {
+    font-size: 12px;
+    color: #b3aca1;
+    letter-spacing: 0.05em;
+  }
+  .spin-btn {
+    appearance: none;
+    border: none;
+    cursor: pointer;
+    background: #2a2a2a;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    padding: 14px 28px;
+    border-radius: 999px;
+    min-height: 48px;
+    min-width: 140px;
+    transition: background .2s ease, transform .08s ease, opacity .2s ease;
+  }
+  .spin-btn:hover:not(:disabled) { background: #404040; }
+  .spin-btn:active:not(:disabled) { transform: scale(0.97); }
+  .spin-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .hint {
+    text-align: center;
+    font-size: 12px;
+    color: #b3aca1;
+    letter-spacing: 0.05em;
+    min-height: 1.2em;
+    transition: color .3s ease;
+  }
+  .hint.win { color: #b48a4e; font-weight: 500; }
+  .hint.error { color: #c44; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="heading">
+    <div class="label">スロット</div>
+    <div class="title" id="title">ちんすこう</div>
+  </header>
+
+  <div class="card">
+    <div class="text-input">
+      <input type="text" id="textInput" placeholder="表示したい文字を入力" maxlength="15">
+      <button id="applyBtn">適用</button>
+    </div>
+    <div class="char-count" id="charCount">5文字</div>
+
+    <div class="reels" id="reels"></div>
+
+    <div class="controls">
+      <div class="meta" id="metaCount">5 × 5</div>
+      <button class="spin-btn" id="spinBtn">スタート</button>
+      <div class="meta" id="counter">READY</div>
+    </div>
+  </div>
+
+  <div class="hint" id="hint">ちんすこうを揃えよう</div>
+</div>
+
+<script>
+(function () {
+  var DEFAULT_TEXT = 'ちんすこう';
+  var MAX_CHARS = 15;
+  var MIN_CHARS = 1;
+  var TRACK_LENGTH = 30;
+
+  var reelsContainer = document.getElementById('reels');
+  var textInput = document.getElementById('textInput');
+  var applyBtn = document.getElementById('applyBtn');
+  var charCount = document.getElementById('charCount');
+  var metaCount = document.getElementById('metaCount');
+  var titleEl = document.getElementById('title');
+  var spinBtn = document.getElementById('spinBtn');
+  var hint = document.getElementById('hint');
+  var counter = document.getElementById('counter');
+
+  var currentText = '';
+  var currentChars = [];
+  var reels = [];
+  var tracks = [];
+  var stops = [];
+  var playCount = 0;
+  var spinning = false;
+
+  function randFromChars() {
+    return currentChars[Math.floor(Math.random() * currentChars.length)];
+  }
+
+  function applyText(rawText) {
+    var text = (rawText == null ? '' : String(rawText));
+    // 空白文字は覗いて文字単位に分解 (Array.from で漢字・絵文字も正しく1要素扱い)
+    var chars = Array.from(text.replace(/\s+/g, ''));
+    if (chars.length < MIN_CHARS) {
+      hint.classList.add('error');
+      hint.classList.remove('win');
+      hint.textContent = '1文字以上入力してください';
+      return false;
+    }
+    if (chars.length > MAX_CHARS) {
+      chars = chars.slice(0, MAX_CHARS);
+    }
+    currentChars = chars;
+    currentText = chars.join('');
+    titleEl.textContent = currentText;
+    textInput.value = currentText;
+    charCount.textContent = currentChars.length + '文字';
+    charCount.classList.remove('error');
+    metaCount.textContent = currentChars.length + ' × ' + currentChars.length;
+    document.documentElement.style.setProperty('--reel-count', currentChars.length);
+    rebuildReels();
+    hint.classList.remove('error', 'win');
+    hint.textContent = currentText + 'を揃えよう';
+    return true;
+  }
+
+  function buildReel(index) {
+    var reel = document.createElement('div');
+    reel.className = 'reel';
+    reel.dataset.pos = String(index);
+
+    var stream = document.createElement('div');
+    stream.className = 'reel-stream';
+    var track = document.createElement('div');
+    track.className = 'reel-track';
+    stream.appendChild(track);
+
+    var stopWrap = document.createElement('div');
+    stopWrap.className = 'reel-stop';
+    var glyph = document.createElement('span');
+    glyph.className = 'glyph';
+    stopWrap.appendChild(glyph);
+
+    // 回転中の流れる文字を事前生成
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < TRACK_LENGTH; i++) {
+      var span = document.createElement('span');
+      span.className = 'glyph';
+      span.textContent = randFromChars();
+      frag.appendChild(span);
+    }
+    track.appendChild(frag);
+    glyph.textContent = randFromChars();
+
+    reel.appendChild(stream);
+    reel.appendChild(stopWrap);
+    return { reel: reel, track: track, stop: glyph };
+  }
+
+  function rebuildReels() {
+    reelsContainer.innerHTML = '';
+    reels = [];
+    tracks = [];
+    stops = [];
+    for (var i = 0; i < currentChars.length; i++) {
+      var built = buildReel(i);
+      reelsContainer.appendChild(built.reel);
+      reels.push(built.reel);
+      tracks.push(built.track);
+      stops.push(built.stop);
+    }
+  }
+
+  function spin() {
+    if (spinning) return;
+    if (currentChars.length === 0) return;
+    spinning = true;
+    spinBtn.disabled = true;
+    textInput.disabled = true;
+    applyBtn.disabled = true;
+    reels.forEach(function (r) { r.classList.remove('win'); });
+    hint.classList.remove('win', 'error');
+    hint.textContent = '回転中…';
+
+    reels.forEach(function (r) { r.classList.add('spinning'); });
+    tracks.forEach(function (t, i) { t.style.animationDelay = (i * -0.025) + 's'; });
+
+    var results = [];
+    var N = reels.length;
+    reels.forEach(function (reel, i) {
+      var finalChar = randFromChars();
+      results.push(finalChar);
+      var stopTime = 600 + i * 320 + Math.random() * 200;
+      setTimeout(function () {
+        reel.classList.remove('spinning');
+        stops[i].textContent = finalChar;
+        if (i === N - 1) finish(results);
+      }, stopTime);
+    });
+  }
+
+  function finish(results) {
+    spinning = false;
+    spinBtn.disabled = false;
+    textInput.disabled = false;
+    applyBtn.disabled = false;
+    playCount++;
+    counter.textContent = 'PLAY ' + String(playCount).padStart(3, '0');
+    if (results.join('') === currentText) {
+      reels.forEach(function (r) { r.classList.add('win'); });
+      hint.classList.add('win');
+      hint.classList.remove('error');
+      hint.textContent = currentText + ' — 成立';
+    } else {
+      hint.classList.remove('win', 'error');
+      hint.textContent = results.join(' ');
+    }
+  }
+
+  spinBtn.addEventListener('click', spin);
+  spinBtn.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    spin();
+  }, { passive: false });
+
+  applyBtn.addEventListener('click', function () {
+    applyText(textInput.value);
+  });
+  textInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyText(textInput.value);
+    }
+  });
+
+  // 初期表示
+  textInput.value = DEFAULT_TEXT;
+  applyText(DEFAULT_TEXT);
+})();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
